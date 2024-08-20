@@ -335,6 +335,11 @@ __pycache__/
 # OpenCover UI analysis results
 OpenCover/
 
+# Ignore specific project and solution files
+raycaster.sln
+raycaster.vcxproj
+raycaster.vcxproj.filters
+
 # Azure Stream Analytics local run output
 ASALocalRun/
 
