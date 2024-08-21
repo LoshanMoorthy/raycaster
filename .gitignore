@@ -367,3 +367,6 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /raycaster.sln
+/include/cimgui
+/raycaster.vcxproj
+/raycaster.vcxproj.filters
