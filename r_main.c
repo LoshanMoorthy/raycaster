@@ -7,8 +7,11 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "assert.h"
-#include "rand.h"
+#define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
+#include <cimgui.h>
+
+#include "a_assert.h"
+#include "r_rand.h"
 
 #define PI 3.14159265359
 #define TAU (2.0 * PI)
@@ -864,6 +867,108 @@ static void present() {
     SDL_RenderPresent(state.renderer);
 }
 
+void process_event(SDL_Event* event) {
+    ImGuiIO* io = igGetIO();
+    switch (event->type) {
+    case SDL_MOUSEBUTTONDOWN:
+    case SDL_MOUSEBUTTONUP:
+    io->MouseDown[event->button.button - 1] = (event->type == SDL_MOUSEBUTTONDOWN);
+    break;
+    case SDL_MOUSEMOTION:
+    io->MousePos.x = (float)event->motion.x;
+    io->MousePos.y = (float)event->motion.y;
+    break;
+    case SDL_MOUSEWHEEL:
+    io->MouseWheel += (float)event->wheel.y;
+    io->MouseWheelH += (float)event->wheel.x;
+    break;
+    case SDL_KEYDOWN:
+    case SDL_KEYUP: {
+        SDL_Keycode key = event->key.keysym.sym;
+        bool is_pressed = (event->type == SDL_KEYDOWN);
+
+        ImGuiKey imgui_key;
+        switch (key) {
+        case SDLK_TAB: imgui_key = ImGuiKey_Tab; break;
+        case SDLK_LEFT: imgui_key = ImGuiKey_LeftArrow; break;
+        case SDLK_RIGHT: imgui_key = ImGuiKey_RightArrow; break;
+        case SDLK_UP: imgui_key = ImGuiKey_UpArrow; break;
+        case SDLK_DOWN: imgui_key = ImGuiKey_DownArrow; break;
+        case SDLK_PAGEUP: imgui_key = ImGuiKey_PageUp; break;
+        case SDLK_PAGEDOWN: imgui_key = ImGuiKey_PageDown; break;
+        case SDLK_HOME: imgui_key = ImGuiKey_Home; break;
+        case SDLK_END: imgui_key = ImGuiKey_End; break;
+        case SDLK_INSERT: imgui_key = ImGuiKey_Insert; break;
+        case SDLK_DELETE: imgui_key = ImGuiKey_Delete; break;
+        case SDLK_BACKSPACE: imgui_key = ImGuiKey_Backspace; break;
+        case SDLK_SPACE: imgui_key = ImGuiKey_Space; break;
+        case SDLK_RETURN: imgui_key = ImGuiKey_Enter; break;
+        case SDLK_ESCAPE: imgui_key = ImGuiKey_Escape; break;
+        default: imgui_key = ImGuiKey_None; break;
+        }
+
+        if (imgui_key != ImGuiKey_None) {
+            ImGuiIO_AddKeyEvent(io, imgui_key, is_pressed);
+        }
+
+        // Handle modifier keys
+        io->KeyCtrl = (event->key.keysym.mod & KMOD_CTRL) != 0;
+        io->KeyShift = (event->key.keysym.mod & KMOD_SHIFT) != 0;
+        io->KeyAlt = (event->key.keysym.mod & KMOD_ALT) != 0;
+        io->KeySuper = (event->key.keysym.mod & KMOD_GUI) != 0;
+        break;
+    }
+    case SDL_TEXTINPUT:
+    ImGuiIO_AddInputCharactersUTF8(io, event->text.text);
+    break;
+    }
+}
+
+
+
+
+void render_imgui(SDL_Renderer* renderer) {
+    ImDrawData* draw_data = igGetDrawData();
+    int fb_width = (int)(draw_data->DisplaySize.x * draw_data->FramebufferScale.x);
+    int fb_height = (int)(draw_data->DisplaySize.y * draw_data->FramebufferScale.y);
+
+    if (fb_height == 0 || fb_width == 0) return;
+
+    for (int n = 0; n < draw_data->CmdListsCount; n++) {
+        ImDrawList* cmd_list = draw_data->CmdLists.Data[n];
+        ImDrawVert* vtx_buffer = cmd_list->VtxBuffer.Data;
+        ImDrawIdx* idx_buffer = cmd_list->IdxBuffer.Data;
+
+        for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++) {
+            ImDrawCmd* pcmd = &cmd_list->CmdBuffer.Data[cmd_i];
+            SDL_Rect clip_rect = {
+                (int)pcmd->ClipRect.x,
+                (int)pcmd->ClipRect.y,
+                (int)(pcmd->ClipRect.z - pcmd->ClipRect.x),
+                (int)(pcmd->ClipRect.w - pcmd->ClipRect.y)
+            };
+
+            SDL_RenderSetClipRect(renderer, &clip_rect);
+
+            for (unsigned int i = 0; i < pcmd->ElemCount; i += 3) {
+                SDL_Vertex verts[3];
+                for (int j = 0; j < 3; j++) {
+                    verts[j].position.x = vtx_buffer[idx_buffer[i + j]].pos.x;
+                    verts[j].position.y = vtx_buffer[idx_buffer[i + j]].pos.y;
+                    verts[j].color.r = vtx_buffer[idx_buffer[i + j]].col & 0xFF;
+                    verts[j].color.g = (vtx_buffer[idx_buffer[i + j]].col >> 8) & 0xFF;
+                    verts[j].color.b = (vtx_buffer[idx_buffer[i + j]].col >> 16) & 0xFF;
+                    verts[j].color.a = (vtx_buffer[idx_buffer[i + j]].col >> 24) & 0xFF;
+                }
+                SDL_RenderGeometry(renderer, NULL, verts, 3, NULL, 0);
+            }
+        }
+    }
+
+    SDL_RenderSetClipRect(renderer, NULL);
+}
+
+
 int main(int argc, char* argv[]) {
     make_trigtabs();
     printf("Im here\n");
@@ -976,9 +1081,34 @@ int main(int argc, char* argv[]) {
 
     printf("Im here\n");
 
+    igCreateContext(NULL);
+    ImGuiIO* io = igGetIO();
+
+    ImFontAtlas* atlas = io->Fonts;
+    ImFontAtlas_AddFontDefault(atlas, NULL);
+
+    // Font atlas
+    unsigned char* pixels;
+    int width, height, bytes_per_pixel;
+    ImFontAtlas_GetTexDataAsRGBA32(atlas, &pixels, &width, &height, &bytes_per_pixel);
+
+    SDL_Texture* font_texture = SDL_CreateTexture(
+        state.renderer,
+        SDL_PIXELFORMAT_ABGR8888,
+        SDL_TEXTUREACCESS_STATIC,
+        width,
+        height
+    );
+
+    SDL_UpdateTexture(font_texture, NULL, pixels, width * 4);
+    SDL_SetTextureBlendMode(font_texture, SDL_BLENDMODE_BLEND);
+
+    io->Fonts->TexID = (void*)font_texture;
+
     while (!state.quit) {
         SDL_Event ev;
         while (SDL_PollEvent(&ev)) {
+            process_event(&ev);
             switch (ev.type) {
             case SDL_QUIT:
             state.quit = true;
@@ -1078,10 +1208,27 @@ int main(int argc, char* argv[]) {
         }
 
         memset(state.pixels, 0, SCREEN_WIDTH * SCREEN_HEIGHT * 4);
+
+
+        int win_width, win_height;
+        SDL_GetWindowSize(state.window, &win_width, &win_height);
+        io->DisplaySize = (ImVec2){ (float)win_width, (float)win_height };
+
+        igNewFrame();
+
+        igSetNextWindowPos((ImVec2) { 50, 50 }, ImGuiCond_Always, (ImVec2) { 0, 0 });
+        igBegin("DEEEBUG", NULL, 0);
+        igText("THIS IS A IMGUI TEST");
+        igEnd();
+
+        igRender();
         render();
+        render_imgui(state.renderer);
+
         if (!state.sleepy) { present(); }
     }
 
+    igDestroyContext(NULL);
     SDL_FreeSurface(texture_surface_loaded);
     SDL_FreeSurface(texture_surface);
     SDL_DestroyTexture(state.debug);

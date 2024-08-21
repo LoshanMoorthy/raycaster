@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include "macros.h"
-#include "types.h"
+#include "m_macros.h"
+#include "t_types.h"
 
 int long_fmtap(
     char* buf,

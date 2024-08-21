@@ -2,8 +2,8 @@
 
 #include <stdlib.h>
 
-#include "types.h"
-#include "macros.h"
+#include "t_types.h"
+#include "m_macros.h"
 
 // xoshiro256+
 typedef struct Rand { u64 s[4]; } Rand;

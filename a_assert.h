@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include "log.h"
+#include "l_log.h"
 
 #ifndef ERROR
 #define ERROR(fmt, ...) fprintf(stderr, fmt "\n", __VA_ARGS__)
