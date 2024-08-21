@@ -370,3 +370,5 @@ FodyWeavers.xsd
 /include/cimgui
 /raycaster.vcxproj
 /raycaster.vcxproj.filters
+*.ini
+*.config
